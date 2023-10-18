@@ -6,7 +6,8 @@
 #include "utils.h"
 #include "logging/logging_t.h"
 
-extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
+#include <sys/time.h>
+//extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
 
 static inline uint64_t now()
 {
@@ -50,7 +51,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
     if (metadata.algorithm != EDDSA_ED25519)
     {
         LOG_ERROR("key %s has algorithm %s, but the request is for eddsa", key_id.c_str(), to_string(metadata.algorithm));
-        throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);    
+        throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
     }
 
     if (players_ids.size() != metadata.t)
@@ -68,7 +69,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
     }
 
     _service.start_signing(key_id, txid, data, metadata_json, players);
-    
+
 #ifdef MOBILE
     {
         std::lock_guard<std::mutex> lg(_timing_map_lock);
@@ -82,7 +83,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
         LOG_ERROR("got too many blocks to sign %lu", blocks);
         throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
     }
-    
+
     LOG_INFO("Starting signing process keyid = %s, txid = %s", key_id.c_str(), txid.c_str());
     eddsa_signing_metadata info = {key_id};
     memcpy(info.chaincode, data.chaincode, sizeof(HDChaincode));
@@ -91,7 +92,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
 
     commitments.reserve(blocks);
     info.sig_data.reserve(blocks);
-    
+
     elliptic_curve_algebra_status status = ELLIPTIC_CURVE_ALGEBRA_UNKNOWN_ERROR;
     elliptic_curve256_scalar_t k;
 
@@ -109,7 +110,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
             LOG_ERROR("Failed to generate k");
             throw cosigner_exception(cosigner_exception::INTERNAL_ERROR);
         }
-        
+
         eddsa_signature_data sigdata;
         throw_cosigner_exception(_ed25519->generator_mul(_ed25519.get(), &sigdata.R.data, &k));
         throw_cosigner_exception(ed25519_algebra_be_to_le(&sigdata.k.data, &k));
@@ -127,7 +128,7 @@ void eddsa_online_signing_service::start_signing(const std::string& key_id, cons
     _service.fill_signing_info_from_metadata(metadata_json, flags);
     for (size_t i = 0; i < blocks; i++)
         info.sig_data[i].flags = flags[i];
-    _signing_persistency.store_signing_data(txid, info);    
+    _signing_persistency.store_signing_data(txid, info);
 }
 
 uint64_t eddsa_online_signing_service::store_commitments(const std::string& txid, const std::map<uint64_t, std::vector<commitment>>& commitments, uint32_t version, std::vector<elliptic_curve_point>& R)
@@ -138,7 +139,7 @@ uint64_t eddsa_online_signing_service::store_commitments(const std::string& txid
     eddsa_signing_metadata data;
     _signing_persistency.load_signing_data(txid, data);
     verify_tenant_id(_service, _key_persistency, data.key_id);
-    
+
 #ifndef MOBILE
     {
         std::lock_guard<std::mutex> lg(_timing_map_lock);
@@ -159,7 +160,7 @@ uint64_t eddsa_online_signing_service::store_commitments(const std::string& txid
         if (commitments.find(*i) == commitments.end())
         {
             LOG_ERROR("commitment for player %lu not found in commitments list", *i);
-            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
     }
     for (auto i = commitments.begin(); i != commitments.end(); ++i)
@@ -167,7 +168,7 @@ uint64_t eddsa_online_signing_service::store_commitments(const std::string& txid
         if (i->second.size() != data.sig_data.size())
         {
             LOG_ERROR("commitment for player %lu size %lu is different from block size %lu", i->first, i->second.size(), data.sig_data.size());
-            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
     }
 
@@ -196,7 +197,7 @@ uint64_t eddsa_online_signing_service::broadcast_si(const std::string& txid, con
     eddsa_signing_metadata data;
     _signing_persistency.load_signing_data(txid, data);
     verify_tenant_id(_service, _key_persistency, data.key_id);
-    
+
     const uint64_t my_id = _service.get_id_from_keyid(data.key_id);
 
     if (data.signers_ids.size() != Rs.size())
@@ -209,7 +210,7 @@ uint64_t eddsa_online_signing_service::broadcast_si(const std::string& txid, con
         if (Rs.find(*i) == Rs.end())
         {
             LOG_ERROR("commitment for player %lu not found in commitments list", *i);
-            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
     }
     for (auto i = Rs.begin(); i != Rs.end(); ++i)
@@ -217,10 +218,10 @@ uint64_t eddsa_online_signing_service::broadcast_si(const std::string& txid, con
         if (i->second.size() != data.sig_data.size())
         {
             LOG_ERROR("commitment for player %lu size %lu is different from block size %lu", i->first, i->second.size(), data.sig_data.size());
-            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
     }
-    
+
     // validate decommitments
     std::map<uint64_t, std::vector<commitment>> commitments;
     _signing_persistency.load_signing_commitments(txid, commitments);
@@ -308,11 +309,11 @@ uint64_t eddsa_online_signing_service::get_eddsa_signature(const std::string& tx
     _signing_persistency.load_signing_data(txid, data);
     verify_tenant_id(_service, _key_persistency, data.key_id);
     uint64_t my_id = _service.get_id_from_keyid(data.key_id);
-    
+
     if (s.size() != data.signers_ids.size())
     {
         LOG_ERROR("got wrong number of s, got %lu expected %lu", s.size(), data.signers_ids.size());
-        throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+        throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
     }
     const std::vector<elliptic_curve_scalar>* my_s = NULL;
     for (auto i = data.signers_ids.begin(); i != data.signers_ids.end(); ++i)
@@ -326,19 +327,19 @@ uint64_t eddsa_online_signing_service::get_eddsa_signature(const std::string& tx
         if (it->second.size() != data.sig_data.size())
         {
             LOG_ERROR("number of s (%lu) from player %lu is different from block size %lu", it->second.size(), *i, data.sig_data.size());
-            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS); 
+            throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
         if (*i == my_id)
             my_s = &it->second;
     }
-    
+
     sig.clear();
     auto algebra = _ed25519.get();
     ed25519_algebra_ctx_t *ed25519 = (ed25519_algebra_ctx_t*)algebra->ctx;
 
     cmp_key_metadata metadata;
     _key_persistency.load_key_metadata(data.key_id, metadata, false);
-    
+
     for (size_t index = 0; index < data.sig_data.size(); ++index)
     {
         if (memcmp(my_s->at(index).data, &data.sig_data[index].s.data, sizeof(elliptic_curve_scalar)) != 0)
@@ -346,12 +347,12 @@ uint64_t eddsa_online_signing_service::get_eddsa_signature(const std::string& tx
             LOG_ERROR("missmatch between my stored s and broadcasted s");
             throw cosigner_exception(cosigner_exception::INVALID_PARAMETERS);
         }
-    
+
         elliptic_curve256_scalar_t s_sum = {0};
-        
+
         for (auto i = s.begin(); i != s.end(); ++i)
             throw_cosigner_exception(algebra->add_scalars(algebra, &s_sum, s_sum, sizeof(elliptic_curve256_scalar_t), i->second[index].data, sizeof(elliptic_curve256_scalar_t)));
-        
+
         eddsa_signature cur_sig;
         memcpy(cur_sig.R, data.sig_data[index].R.data, sizeof(ed25519_point_t));
         ed25519_algebra_be_to_le(&cur_sig.s, &s_sum);
@@ -379,7 +380,7 @@ uint64_t eddsa_online_signing_service::get_eddsa_signature(const std::string& tx
 
         sig.push_back(cur_sig);
     }
-    
+
     _signing_persistency.delete_signing_data(txid);
 
     std::lock_guard<std::mutex> time_lock(_timing_map_lock);

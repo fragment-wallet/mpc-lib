@@ -8,7 +8,8 @@
 
 #include <openssl/sha.h>
 
-extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
+#include <sys/time.h>
+//extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
 
 namespace fireblocks
 {
@@ -140,7 +141,7 @@ void asymmetric_eddsa_cosigner_server::eddsa_sign_offline(const std::string& key
         std::lock_guard<std::mutex> lg(_timing_map_lock);
         _timing_map[txid] = clock();
     }
-    
+
     uint64_t my_id = _service.get_id_from_keyid(key_id);
 
     LOG_INFO("Starting signing process keyid = %s, txid = %s", key_id.c_str(), txid.c_str());
@@ -504,7 +505,7 @@ uint64_t asymmetric_eddsa_cosigner_server::get_eddsa_signature(const std::string
 
     cmp_key_metadata metadata;
     _key_persistency.load_key_metadata(data.key_id, metadata, false);
-    
+
     for (size_t index = 0; index < data.sig_data.size(); ++index)
     {
         eddsa_signature cur_sig;

@@ -8,6 +8,9 @@
 #include "utils.h"
 #include "logging/logging_t.h"
 
+#include <sys/time.h>
+//extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
+
 namespace fireblocks
 {
 namespace common
@@ -33,8 +36,6 @@ static inline std::string HexStr(const T itbegin, const T itend)
     return rv;
 }
 #endif
-
-extern "C" int gettimeofday(struct timeval *tv, struct timezone *tz);
 
 static inline uint64_t clock()
 {
@@ -453,7 +454,7 @@ uint64_t cmp_ecdsa_online_signing_service::get_cmp_signature(const std::string& 
             LOG_ERROR("failed to derive public key for block %lu, error %d", i, derivation_status);
             throw cosigner_exception(cosigner_exception::INTERNAL_ERROR);
         }
-        
+
         elliptic_curve_algebra_status status = GFp_curve_algebra_verify_signature(curve, &derived_public_key, &data.message, &sig.r, &sig.s);
         if (status != ELLIPTIC_CURVE_ALGEBRA_SUCCESS)
         {
