@@ -3,9 +3,11 @@
 #include <string>
 
 #include "cosigner/cmp_ecdsa_online_signing_service.h"
-#include "cosigner/sign_algorithm.h"
 #include "cosigner/platform_service.h"
+#include "cosigner/sign_algorithm.h"
 #include "cosigner/types.h"
+#include "crypto/keccak1600/keccak1600.h"
+#include <openssl/sha.h>
 
 using namespace fireblocks::common::cosigner;
 
@@ -32,6 +34,33 @@ private:
 
 extern "C" {
 
+int sha256(char in[], unsigned char out[])
+{
+    long unsigned int i = 0;
+
+    while (in[i]!=0) i++;
+
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, in, i);
+    SHA256_Final(out, &sha256);
+
+    return 0;
+}
+
+void keccak1600(unsigned char in[], unsigned char out[])
+{
+    long unsigned int i = 0;
+
+    while (in[i]!=0) i++;
+
+    KECCAK1600_CTX hash_ctx;
+    keccak1600_init(&hash_ctx, 512, KECCAK256_PAD);
+    keccak1600_update(&hash_ctx, in, i);
+    keccak1600_final(&hash_ctx, out);
+}
+
+
 /*
 Keygen service: cmp_setup_service
 Signing service: cmp_ecdsa_signing_service
@@ -44,7 +73,7 @@ struct test_struct {
 
 
 int ecdsa_keygen_1(test_struct s, cosigner_sign_algorithm type, const std::string& keyid) {
-    elliptic_curve256_algebra_ctx_t algebra = *elliptic_curve256_new_secp256k1_algebra();
+    // elliptic_curve256_algebra_ctx_t algebra = *elliptic_curve256_new_secp256k1_algebra();
     // const size_t PUBKEY_SIZE = algebra->point_size(algebra);
     platform plt = platform(42);
 
@@ -54,9 +83,5 @@ int ecdsa_keygen_1(test_struct s, cosigner_sign_algorithm type, const std::strin
 
     return s.a;
 }
-
-// void ecdsa_keygen_3(elliptic_curve256_point_t& pubkey) {
-
-// }
 
 }

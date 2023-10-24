@@ -21,16 +21,16 @@ link_objects() {
     # but the mpc archive lib is given as a compilation target, alongside the cpp  targets
     em++ wasm/wasm_wrappers.cpp \
       "${lib_dir}/mpc.a" \
-      -sEXPORTED_FUNCTIONS="_malloc,_free,_ecdsa_keygen_1" \
+      -sEXPORTED_FUNCTIONS="_malloc,_free,_sha256,_keccak1600,_ecdsa_keygen_1" \
       --no-entry \
       -O2 -m32 -fdiagnostics-color=always \
-      -std=c++20 -pthread -sALLOW_MEMORY_GROWTH \
+      -std=c++20 \
       -Wall \
       -lssl -lcrypto \
       -L /openssl/libs \
       -I /openssl/include \
       -I ./include \
-      -o "${build_dir}/mpc.html"
+      -o "${build_dir}/mpc.wasm"
 
     # Left out flags:
     # -fstack-protector-strong
